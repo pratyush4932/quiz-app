@@ -147,10 +147,13 @@ export default function QuizPage() {
 
     const confirmFinish = async () => {
         setConfirmSubmitOpen(false);
+        console.log("Submitting quiz...");
         try {
-            await api.post('/quiz/submit', {});
+            const res = await api.post('/quiz/submit', {});
+            console.log("Quiz submitted successfully:", res.data);
             setIsSubmitted(true);
         } catch (err) {
+            console.error("Failed to submit quiz:", err);
             showToast('Failed to submit quiz.', 'error');
         }
     };
@@ -203,7 +206,7 @@ export default function QuizPage() {
                         Mission Complete
                     </h1>
                     <p className="text-gray-300 text-lg">
-                        Good job, <span className="font-bold text-white">{user.teamId}</span>.<br />
+                        Good job, <span className="font-bold text-white">{user?.teamId || 'Team'}</span>.<br />
                         Your session has been finalized.
                     </p>
 
