@@ -49,6 +49,20 @@ export default function QuizPage() {
 
     const closeToast = () => setToast(null);
 
+    const [quizInfo, setQuizInfo] = useState({ duration: 0, questionCount: 0 });
+
+    useEffect(() => {
+        const fetchInfo = async () => {
+            try {
+                const res = await api.get('/quiz/info');
+                setQuizInfo(res.data);
+            } catch (err) {
+                console.error("Failed to fetch quiz info");
+            }
+        };
+        fetchInfo();
+    }, []);
+
     useEffect(() => {
         if (!loading && !user) {
             router.push('/');
@@ -227,19 +241,7 @@ export default function QuizPage() {
         );
     }
 
-    const [quizInfo, setQuizInfo] = useState({ duration: 0, questionCount: 0 });
 
-    useEffect(() => {
-        const fetchInfo = async () => {
-            try {
-                const res = await api.get('/quiz/info');
-                setQuizInfo(res.data);
-            } catch (err) {
-                console.error("Failed to fetch quiz info");
-            }
-        };
-        fetchInfo();
-    }, []);
 
     // ... existing startQuiz ...
 
