@@ -103,8 +103,17 @@ export default function AdminPage() {
                 const elapsed = now - startTime;
                 const remainingSeconds = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
 
-                if (remainingSeconds === 0) {
+                if (remainingSeconds <= 0) {
                     setTimeLeft('00:00');
+                    if (settings.isLive) {
+                        api.put('/admin/settings', { isLive: false })
+                            .then(res => {
+                                setSettings(res.data);
+                                showToast('Time Up! Quiz Auto-Stopped.', 'info');
+                            })
+                            .catch(() => showToast('Failed to auto-stop quiz', 'error'));
+                    }
+                    clearInterval(interval);
                 } else {
                     const m = Math.floor(remainingSeconds / 60);
                     const s = remainingSeconds % 60;
