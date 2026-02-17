@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Team = require('../models/Team');
 const Admin = require('../models/Admin');
-const { auth } = require('../middleware/authMiddleware');
+const { auth, adminAuth } = require('../middleware/authMiddleware');
 
 // @route   POST api/auth/login
 // @desc    Team Login
@@ -69,6 +69,30 @@ router.get('/user', auth, async (req, res) => {
     try {
         const team = await Team.findById(req.user.id).select('-password');
         res.json(team);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   PUT api/auth/admin/update-password
+// @desc    Update Admin Password
+// @access  Private (Admin)
+router.put('/admin/update-password', adminAuth, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    try {
+        const admin = await Admin.findById(req.user.id);
+        if (!admin) return res.status(404).json({ msg: 'Admin not found' });
+
+        const isMatch = await bcrypt.compare(currentPassword, admin.password);
+        if (!isMatch) return res.status(400).json({ msg: 'Invalid Current Password' });
+
+        const salt = await bcrypt.genSalt(10);
+        admin.password = await bcrypt.hash(newPassword, salt);
+
+        await admin.save();
+        res.json({ msg: 'Password Updated Successfully' });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
