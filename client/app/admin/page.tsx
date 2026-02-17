@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 
 import api from '../../utils/api';
-import { FaTrophy, FaEdit, FaPlus, FaSync, FaUserFriends, FaClipboardList, FaTrash, FaSave, FaTimes } from 'react-icons/fa';
+import { FaTrophy, FaEdit, FaPlus, FaSync, FaUserFriends, FaClipboardList, FaTrash, FaSave, FaTimes, FaSignOutAlt, FaKey } from 'react-icons/fa';
 import Modal from '../../components/Modal';
 import Toast, { ToastType } from '../../components/Toast';
 
@@ -35,7 +35,7 @@ interface TeamResult {
 }
 
 export default function AdminPage() {
-    const { user, loading } = useAuth();
+    const { user, loading, logout } = useAuth();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'questions' | 'results' | 'teams'>('results');
     const [questions, setQuestions] = useState<Question[]>([]);
@@ -66,6 +66,8 @@ export default function AdminPage() {
         message: string;
         onConfirm: () => void;
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+    const [changePasswordModal, setChangePasswordModal] = useState(false);
+    const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
     const showToast = (msg: string, type: ToastType = 'success') => {
         setToast({ msg, type });
@@ -250,6 +252,26 @@ export default function AdminPage() {
             }
             closeConfirm();
         });
+
+    };
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            showToast('New passwords do not match', 'error');
+            return;
+        }
+        try {
+            await api.put('/auth/admin/update-password', {
+                currentPassword: passwordData.currentPassword,
+                newPassword: passwordData.newPassword
+            });
+            showToast('Password Updated Successfully', 'success');
+            setChangePasswordModal(false);
+            setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        } catch (err: any) {
+            showToast(err.response?.data?.msg || 'Failed to update password', 'error');
+        }
     };
 
     const calculateDuration = (start?: string, end?: string) => {
@@ -315,24 +337,40 @@ export default function AdminPage() {
                         </div>
                     </div>
 
-                    <div className="flex bg-black/30 p-1.5 rounded-xl border border-white/10 backdrop-blur-md">
+                    <div className="flex items-center gap-4">
+                        <div className="flex bg-black/30 p-1.5 rounded-xl border border-white/10 backdrop-blur-md">
+                            <button
+                                onClick={() => setActiveTab('results')}
+                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'results' ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            >
+                                <FaTrophy /> Leaderboard
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('questions')}
+                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'questions' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            >
+                                <FaEdit /> Questions
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('teams')}
+                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'teams' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            >
+                                <FaUserFriends /> Teams
+                            </button>
+                        </div>
                         <button
-                            onClick={() => setActiveTab('results')}
-                            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'results' ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            onClick={() => setChangePasswordModal(true)}
+                            className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white p-3 rounded-xl border border-blue-600/30 transition-all shadow-lg"
+                            title="Change Password"
                         >
-                            <FaTrophy /> Leaderboard
+                            <FaKey className="text-xl" />
                         </button>
                         <button
-                            onClick={() => setActiveTab('questions')}
-                            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'questions' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            onClick={logout}
+                            className="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white p-3 rounded-xl border border-red-600/30 transition-all shadow-lg"
+                            title="Logout"
                         >
-                            <FaEdit /> Questions
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('teams')}
-                            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'teams' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                        >
-                            <FaUserFriends /> Teams
+                            <FaSignOutAlt className="text-xl" />
                         </button>
                     </div>
                 </header>
@@ -606,6 +644,61 @@ export default function AdminPage() {
                 }
             >
                 <p>{confirmModal.message}</p>
+            </Modal>
+
+            <Modal
+                isOpen={changePasswordModal}
+                onClose={() => setChangePasswordModal(false)}
+                title="Change Admin Password"
+                actions={null}
+            >
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Current Password</label>
+                        <input
+                            type="password"
+                            value={passwordData.currentPassword}
+                            onChange={e => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 transition-colors"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">New Password</label>
+                        <input
+                            type="password"
+                            value={passwordData.newPassword}
+                            onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 transition-colors"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Confirm New Password</label>
+                        <input
+                            type="password"
+                            value={passwordData.confirmPassword}
+                            onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 transition-colors"
+                            required
+                        />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setChangePasswordModal(false)}
+                            className="flex-1 py-3 rounded-lg text-gray-400 hover:bg-white/5 font-bold transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors shadow-lg"
+                        >
+                            Update Password
+                        </button>
+                    </div>
+                </form>
             </Modal>
         </main >
     );
