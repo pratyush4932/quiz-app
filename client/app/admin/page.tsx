@@ -319,7 +319,7 @@ export default function AdminPage() {
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                     <div>
                         <h1 className="text-3xl font-extrabold text-white mb-2 flex items-center gap-3">
-                            <FaUserFriends className="text-emerald-400" /> Admin Dashboard
+                            <FaUserFriends className="text-primary-start" /> Admin Dashboard
                         </h1>
                         <p className="text-sm text-gray-400 mb-4">Manage competition and view live analytics</p>
 
@@ -327,7 +327,7 @@ export default function AdminPage() {
                         <div className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/10 w-fit">
                             <button
                                 onClick={handleToggleQuiz}
-                                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${settings.isLive ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${settings.isLive ? 'bg-error hover:opacity-80 text-white' : 'bg-success hover:opacity-80 text-black'}`}
                             >
                                 {settings.isLive ? 'STOP QUIZ' : 'START QUIZ'}
                             </button>
@@ -340,7 +340,7 @@ export default function AdminPage() {
                                     className="w-16 bg-black/30 border border-white/10 rounded-lg p-2 text-center text-white font-mono font-bold"
                                 />
                             </div>
-                            <div className="px-4 py-2 bg-black/30 rounded-lg border border-white/10 font-mono font-bold text-lg text-emerald-400 min-w-[80px] text-center">
+                            <div className="px-4 py-2 bg-black/30 rounded-lg border border-white/10 font-mono font-bold text-lg text-primary-start min-w-[80px] text-center">
                                 {timeLeft}
                             </div>
                         </div>
@@ -369,14 +369,14 @@ export default function AdminPage() {
                         </div>
                         <button
                             onClick={() => setChangePasswordModal(true)}
-                            className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white p-3 rounded-xl border border-blue-600/30 transition-all shadow-lg"
+                            className="bg-primary-start/20 hover:bg-primary-start text-primary-start hover:text-white p-3 rounded-xl border border-primary-start/30 transition-all shadow-lg"
                             title="Change Password"
                         >
                             <FaKey className="text-xl" />
                         </button>
                         <button
                             onClick={logout}
-                            className="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white p-3 rounded-xl border border-red-600/30 transition-all shadow-lg"
+                            className="bg-error/20 hover:bg-error text-error hover:text-white p-3 rounded-xl border border-error/30 transition-all shadow-lg"
                             title="Logout"
                         >
                             <FaSignOutAlt className="text-xl" />
@@ -408,7 +408,7 @@ export default function AdminPage() {
                                             <td className="p-4 pl-6 font-bold text-gray-500 group-hover:text-white transition-colors">
                                                 {idx === 0 ? '👑' : `#${idx + 1}`}
                                             </td>
-                                            <td className="p-4 font-mono text-emerald-300 font-bold">{team.teamId}</td>
+                                            <td className="p-4 font-mono text-primary-start font-bold">{team.teamId}</td>
                                             <td className="p-4 font-bold text-xl">{team.score}</td>
                                             <td className="p-4 pr-6 text-gray-400 font-mono">
                                                 {formatDuration(calculateDuration(team.startTime, team.endTime))}
@@ -435,7 +435,7 @@ export default function AdminPage() {
                                     <textarea
                                         value={newQText}
                                         onChange={e => setNewQText(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-blue-500 focus:bg-black/50 outline-none transition-all text-sm"
+                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-start focus:bg-black/50 outline-none transition-all text-sm"
                                         rows={4}
                                         placeholder="Enter question here..."
                                         required
@@ -447,7 +447,7 @@ export default function AdminPage() {
                                         type="text"
                                         value={newQImage}
                                         onChange={e => setNewQImage(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-blue-500 focus:bg-black/50 outline-none transition-all text-sm mb-2"
+                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-start focus:bg-black/50 outline-none transition-all text-sm mb-2"
                                         placeholder="https://example.com/image.jpg"
                                     />
                                     {newQImage && (
@@ -461,7 +461,7 @@ export default function AdminPage() {
                                     <select
                                         value={newQDifficulty}
                                         onChange={e => setNewQDifficulty(e.target.value as any)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-blue-500 focus:bg-black/50 outline-none transition-all text-sm text-gray-300"
+                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-start focus:bg-black/50 outline-none transition-all text-sm text-gray-300"
                                     >
                                         <option value="Easy">Easy (25 pts)</option>
                                         <option value="Medium">Medium (50 pts)</option>
@@ -474,7 +474,7 @@ export default function AdminPage() {
                                         type="text"
                                         value={newQAnswer}
                                         onChange={e => setNewQAnswer(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-green-500 focus:bg-black/50 outline-none transition-all text-sm font-bold text-green-400"
+                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-success focus:bg-black/50 outline-none transition-all text-sm font-bold text-success"
                                         placeholder="Enter correct answer..."
                                         required
                                     />
@@ -486,11 +486,11 @@ export default function AdminPage() {
                                         min="1"
                                         value={newQMaxAttempts}
                                         onChange={e => setNewQMaxAttempts(parseInt(e.target.value))}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-purple-500 focus:bg-black/50 outline-none transition-all text-sm text-gray-300 font-mono"
+                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-end focus:bg-black/50 outline-none transition-all text-sm text-gray-300 font-mono"
                                     />
                                 </div>
                                 <div className="flex gap-2 mt-4">
-                                    <button type="submit" className={`flex-1 ${editingQId ? 'bg-gradient-to-r from-yellow-600 to-orange-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600'} hover:opacity-90 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2`}>
+                                    <button type="submit" className={`flex-1 ${editingQId ? 'bg-gradient-to-r from-yellow-600 to-orange-600' : 'bg-gradient-to-r from-primary-start to-primary-end'} hover:opacity-90 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2`}>
                                         {editingQId ? <><FaSave /> Update</> : <><FaPlus /> Create</>}
                                     </button>
                                     {editingQId && (
@@ -512,11 +512,11 @@ export default function AdminPage() {
                             {questions.map((q, idx) => (
                                 <div key={q._id} className={`glass p-5 rounded-xl border hover:border-white/20 transition-all group relative ${editingQId === q._id ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-white/5'}`}>
                                     <div className="flex justify-between items-start mb-3">
-                                        <span className="font-mono text-xs text-blue-400 font-bold">Q{idx + 1}</span>
+                                        <span className="font-mono text-xs text-primary-start font-bold">Q{idx + 1}</span>
                                         <div className="flex items-center gap-2">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${q.difficulty === 'Easy' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${q.difficulty === 'Easy' ? 'bg-success/10 text-success border-success/20' :
                                                 q.difficulty === 'Medium' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                                                    'bg-red-500/10 text-red-400 border-red-500/20'
+                                                    'bg-error/10 text-error border-error/20'
                                                 }`}>{q.difficulty || 'Medium'}</span>
                                             <span className="text-xs text-gray-500 font-mono border border-white/5 px-2 py-0.5 rounded-full">
                                                 Tries: {q.maxAttempts || 1}
@@ -529,7 +529,7 @@ export default function AdminPage() {
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteQuestion(q._id)}
-                                                className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                                                className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-error hover:bg-error/10 transition-colors"
                                             >
                                                 <FaTrash size={14} />
                                             </button>
@@ -541,9 +541,9 @@ export default function AdminPage() {
                                         </div>
                                     )}
                                     <p className="font-semibold mb-4 text-gray-200 text-lg leading-snug">{q.text}</p>
-                                    <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg">
-                                        <span className="text-xs text-green-500 font-bold uppercase block mb-1">Correct Answer</span>
-                                        <span className="text-green-300 font-mono">{q.correctAnswer}</span>
+                                    <div className="bg-success/10 border border-success/20 p-3 rounded-lg">
+                                        <span className="text-xs text-success font-bold uppercase block mb-1">Correct Answer</span>
+                                        <span className="text-success font-mono">{q.correctAnswer}</span>
                                     </div>
                                 </div>
                             ))}
@@ -597,9 +597,9 @@ export default function AdminPage() {
                             <div className="space-y-3">
                                 {results.map((team) => (
                                     <div key={team.teamId} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/20 transition-all group">
-                                        <div className="font-mono text-lg font-bold text-purple-300">{team.teamId}</div>
+                                        <div className="font-mono text-lg font-bold text-primary-end">{team.teamId}</div>
                                         <div className="flex items-center gap-3">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border capitalize ${team.quizStatus === 'submitted' ? 'bg-green-500/10 text-green-300 border-green-500/20' :
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border capitalize ${team.quizStatus === 'submitted' ? 'bg-success/10 text-success border-success/20' :
                                                 team.quizStatus === 'in_progress' ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20' :
                                                     'bg-gray-700/50 text-gray-400 border-gray-600'
                                                 }`}>
@@ -607,7 +607,7 @@ export default function AdminPage() {
                                             </span>
                                             <button
                                                 onClick={() => handleDeleteTeam(team._id, team.teamId)}
-                                                className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                                                className="p-2 rounded-lg text-gray-500 hover:text-error hover:bg-error/20 transition-colors opacity-0 group-hover:opacity-100"
                                                 title="Delete Team"
                                             >
                                                 <FaTrash />
@@ -645,7 +645,7 @@ export default function AdminPage() {
                         </button>
                         <button
                             onClick={confirmModal.onConfirm}
-                            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition-colors shadow-lg"
+                            className="px-4 py-2 rounded-lg bg-error hover:bg-red-500 text-white font-bold transition-colors shadow-lg"
                         >
                             Confirm
                         </button>
@@ -668,7 +668,7 @@ export default function AdminPage() {
                             type="password"
                             value={passwordData.currentPassword}
                             onChange={e => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 transition-colors"
+                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary-start transition-colors"
                             required
                         />
                     </div>
@@ -678,7 +678,7 @@ export default function AdminPage() {
                             type="password"
                             value={passwordData.newPassword}
                             onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 transition-colors"
+                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary-start transition-colors"
                             required
                         />
                     </div>
@@ -688,7 +688,7 @@ export default function AdminPage() {
                             type="password"
                             value={passwordData.confirmPassword}
                             onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-blue-500 transition-colors"
+                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary-start transition-colors"
                             required
                         />
                     </div>
@@ -702,7 +702,7 @@ export default function AdminPage() {
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors shadow-lg"
+                            className="flex-1 py-3 rounded-lg bg-primary-start hover:bg-blue-500 text-white font-bold transition-colors shadow-lg"
                         >
                             Update Password
                         </button>

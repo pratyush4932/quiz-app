@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaClock, FaCheckCircle, FaChevronRight, FaChevronLeft, FaFlagCheckered, FaList, FaLock, FaTimesCircle, FaBars } from 'react-icons/fa';
 import Modal from '../../components/Modal';
 import Toast, { ToastType } from '../../components/Toast';
+import Celebration from '../../components/Celebration';
 
 interface Question {
     _id: string;
@@ -248,17 +249,14 @@ export default function QuizPage() {
     if (!quizStarted) {
         return (
             <main className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
-                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px]" />
-                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px]" />
-                </div>
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10" />
 
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center space-y-8 glass p-12 rounded-3xl max-w-2xl w-full border border-white/10"
                 >
-                    <h1 className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+                    <h1 className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary-start to-primary-end">
                         Team {user.teamId}
                     </h1>
                     <div className="space-y-4 text-gray-300 text-lg">
@@ -270,7 +268,7 @@ export default function QuizPage() {
                     </div>
                     <button
                         onClick={startQuiz}
-                        className="px-10 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl font-bold text-xl shadow-lg shadow-blue-900/40 transition-all transform hover:scale-105"
+                        className="px-10 py-4 bg-gradient-to-r from-primary-start to-primary-end hover:brightness-110 rounded-xl font-bold text-xl shadow-lg shadow-primary-start/40 transition-all transform hover:scale-105"
                     >
                         Initialize Quiz Sequence
                     </button>
@@ -291,27 +289,7 @@ export default function QuizPage() {
 
     return (
         <main className="min-h-screen flex flex-col md:flex-row relative overflow-hidden">
-            {/* Animated Background Elements (Copied from Login) */}
-            <div className="absolute inset-0 overflow-hidden -z-10 pointer-events-none">
-                <motion.div
-                    animate={{
-                        x: [0, 50, -50, 0],
-                        y: [0, -50, 50, 0],
-                        rotate: [0, 180, 360]
-                    }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                    className="absolute top-20 left-20 w-72 h-72 bg-purple-500/20 rounded-full blur-[100px]"
-                />
-                <motion.div
-                    animate={{
-                        x: [0, -30, 30, 0],
-                        y: [0, 30, -30, 0],
-                        scale: [1, 1.2, 0.9, 1]
-                    }}
-                    transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute bottom-20 right-20 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px]"
-                />
-            </div>
+            <Celebration trigger={feedback?.type === 'success'} />
 
             {/* Sidebar Navigation (Desktop: Always visible, Mobile: Slide-over) */}
             <aside className={`fixed md:relative z-40 h-full w-64 bg-white/5 backdrop-blur-xl border-r border-white/10 transition-all duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
@@ -409,8 +387,8 @@ export default function QuizPage() {
                                         </div>
                                     </div>
 
-                                    {qState.isCorrect && <div className="text-green-400 font-bold flex items-center gap-2"><FaCheckCircle /> Solved</div>}
-                                    {qState.isLocked && !qState.isCorrect && <div className="text-red-400 font-bold flex items-center gap-2"><FaLock /> Locked</div>}
+                                    {qState.isCorrect && <div className="text-success font-bold flex items-center gap-2"><FaCheckCircle /> Solved</div>}
+                                    {qState.isLocked && !qState.isCorrect && <div className="text-error font-bold flex items-center gap-2"><FaLock /> Locked</div>}
                                 </div>
 
                                 <h3 className="text-2xl md:text-3xl font-bold mb-8 leading-relaxed text-gray-100">
@@ -433,14 +411,14 @@ export default function QuizPage() {
                                             disabled={qState.isLocked || submitting}
                                             className={`w-full bg-white/5 border rounded-xl p-5 text-xl outline-none transition-all shadow-inner
                                                 ${qState.isCorrect ? 'border-green-500/50 text-green-400' :
-                                                    qState.isLocked ? 'border-red-500/50 text-red-400' :
-                                                        'border-white/10 text-white focus:border-blue-500 focus:bg-white/10'}`}
+                                                    qState.isLocked ? 'border-error/50 text-error' :
+                                                        'border-white/10 text-white focus:border-primary-start focus:bg-white/10'}`}
                                             placeholder={qState.isLocked ? "" : "Type answer here..."}
                                             autoFocus={!qState.isLocked}
                                         />
                                         {qState.isLocked && (
                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xl">
-                                                {qState.isCorrect ? <FaCheckCircle className="text-green-500" /> : <FaLock className="text-red-500" />}
+                                                {qState.isCorrect ? <FaCheckCircle className="text-success" /> : <FaLock className="text-error" />}
                                             </div>
                                         )}
                                     </div>
@@ -451,7 +429,7 @@ export default function QuizPage() {
                                                 initial={{ opacity: 0, y: -10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 exit={{ opacity: 0 }}
-                                                className={`p-3 rounded-lg text-sm font-bold flex items-center gap-2 ${feedback.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                                                className={`p-3 rounded-lg text-sm font-bold flex items-center gap-2 ${feedback.type === 'success' ? 'bg-success/20 text-success' : 'bg-error/20 text-error'}`}
                                             >
                                                 {feedback.type === 'success' ? <FaCheckCircle /> : <FaTimesCircle />}
                                                 {feedback.msg}
@@ -463,7 +441,7 @@ export default function QuizPage() {
                                         <button
                                             type="submit"
                                             disabled={submitting || !answerText.trim()}
-                                            className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-xl shadow-lg shadow-blue-900/40 transition-all active:scale-95"
+                                            className="w-full py-4 bg-gradient-to-r from-primary-start to-primary-end hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-xl shadow-lg shadow-primary-start/40 transition-all active:scale-95"
                                         >
                                             {submitting ? 'Verifying...' : 'Submit Answer'}
                                         </button>

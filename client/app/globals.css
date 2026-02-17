@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0f172a;
-  --foreground: #f8fafc;
+  --background: #0A0A23;
+  --foreground: #F8FAFC;
+  --primary-start: #3A86FF;
+  --primary-end: #8338EC;
+  --success: #9EF01A;
+  --error: #FF6B6B;
 }
 
 @theme inline {
@@ -10,45 +14,51 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Custom Colors */
+  --color-primary-start: var(--primary-start);
+  --color-primary-end: var(--primary-end);
+  --color-success: var(--success);
+  --color-error: var(--error);
 }
 
 body {
-  background: radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-    radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
-    radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
-  background-color: #0f172a;
-  background-attachment: fixed;
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   min-height: 100vh;
-  overflow-y: auto;
   overflow-x: hidden;
+  /* subtle gradient overlay */
+  background-image:
+    radial-gradient(circle at 15% 50%, rgba(58, 134, 255, 0.08), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(131, 56, 236, 0.08), transparent 25%);
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Glassmorphism Utilities */
+/* Glassmorphism Utilities - Updated for cleaner look */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
 }
 
 /* Hide Next.js Dev Overlay/Indicators/Tools */
