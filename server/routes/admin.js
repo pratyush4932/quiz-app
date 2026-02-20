@@ -46,14 +46,15 @@ router.post('/teams', adminAuth, async (req, res) => {
 // @access  Private (Admin)
 router.post('/questions', adminAuth, async (req, res) => {
     try {
-        const { text, image, correctAnswer, category, difficulty, maxAttempts } = req.body;
+        const { text, links, correctAnswer, category, difficulty, maxAttempts, hints } = req.body;
         const newQuestion = new Question({
             text,
-            image,
+            links: links || [],
             correctAnswer,
             category,
             difficulty,
-            maxAttempts
+            maxAttempts,
+            hints: hints || []
         });
         const question = await newQuestion.save();
         res.json(question);
@@ -120,17 +121,17 @@ router.put('/settings', adminAuth, async (req, res) => {
         if (isLive !== undefined) settings.isLive = isLive;
         if (duration !== undefined) settings.duration = duration;
 
-        if (isLive && !settings.startTime) {
+        if (isLive === true && !settings.startTime) {
             settings.startTime = new Date();
-        } else if (!isLive) {
-            settings.startTime = null;
+        } else if (isLive === false) {
+            settings.startTime = undefined;
         }
 
         await settings.save();
         res.json(settings);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error('Settings update error:', err.message, err);
+        res.status(500).json({ msg: 'Server Error', detail: err.message });
     }
 });
 
@@ -173,13 +174,13 @@ router.delete('/questions/:id', adminAuth, async (req, res) => {
 // @access  Private (Admin)
 router.put('/questions/:id', adminAuth, async (req, res) => {
     try {
-        const { text, image, correctAnswer, category, difficulty, maxAttempts } = req.body;
+        const { text, links, correctAnswer, category, difficulty, maxAttempts, hints } = req.body;
         let question = await Question.findById(req.params.id);
         if (!question) return res.status(404).json({ msg: 'Question not found' });
 
         question = await Question.findByIdAndUpdate(
             req.params.id,
-            { text, image, correctAnswer, category, difficulty, maxAttempts },
+            { text, links: links || [], correctAnswer, category, difficulty, maxAttempts, hints: hints || [] },
             { new: true }
         );
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -12,11 +13,12 @@ import Toast, { ToastType } from '../../components/Toast';
 interface Question {
     _id: string;
     text: string;
-    image?: string;
+    links?: { label: string; url: string }[];
     correctAnswer: string;
     category: string;
     difficulty: 'Easy' | 'Medium' | 'Hard';
     maxAttempts?: number;
+    hints?: string[];
 }
 
 interface Settings {
@@ -42,6 +44,8 @@ export default function AdminPage() {
     const [results, setResults] = useState<TeamResult[]>([]);
     const [settings, setSettings] = useState<Settings>({ isLive: false, duration: 30 });
     const [timeLeft, setTimeLeft] = useState<string>('--:--');
+    // Track previous ranks for ↑/↓ animation indicator
+    const previousRanksRef = useRef<Record<string, number>>({});
 
     // New Question Form State
     const [newQText, setNewQText] = useState('');
@@ -49,6 +53,8 @@ export default function AdminPage() {
     const [newQAnswer, setNewQAnswer] = useState('');
     const [newQDifficulty, setNewQDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
     const [newQMaxAttempts, setNewQMaxAttempts] = useState(1);
+    const [newQHints, setNewQHints] = useState<string[]>(['', '']);
+    const [newQLinks, setNewQLinks] = useState<{ label: string; url: string }[]>([]);
 
     // Edit Question State
     const [editingQId, setEditingQId] = useState<string | null>(null);
@@ -143,37 +149,57 @@ export default function AdminPage() {
         }
     };
 
+    // Lightweight results-only refresh (for leaderboard auto-update)
+    const fetchResults = async () => {
+        try {
+            const rRes = await api.get('/admin/results');
+            setResults(rRes.data);
+        } catch (err) {
+            // Silently fail — don't disrupt UI for background poll
+        }
+    };
+
+    // Auto-refresh leaderboard every 30s, only while quiz is live
+    useEffect(() => {
+        if (!settings.isLive) return;
+        const pollInterval = setInterval(fetchResults, 30000);
+        return () => clearInterval(pollInterval);
+    }, [settings.isLive]);
+
     const handleAddQuestion = async (e: React.FormEvent) => {
         e.preventDefault();
+        const maxHints = newQDifficulty === 'Easy' ? 1 : newQDifficulty === 'Medium' ? 2 : 3;
+        const hints = newQHints.slice(0, maxHints).filter(h => h.trim() !== '');
+        const links = newQLinks.filter(l => l.url.trim() !== '');
         try {
             if (editingQId) {
-                // Update Logic
                 await api.put(`/admin/questions/${editingQId}`, {
                     text: newQText,
-                    image: newQImage,
+                    links,
                     correctAnswer: newQAnswer,
                     difficulty: newQDifficulty,
-                    maxAttempts: newQMaxAttempts
+                    maxAttempts: newQMaxAttempts,
+                    hints
                 });
                 showToast('Question Updated!', 'success');
                 setEditingQId(null);
             } else {
-                // Create Logic
                 await api.post('/admin/questions', {
                     text: newQText,
-                    image: newQImage,
+                    links,
                     correctAnswer: newQAnswer,
                     difficulty: newQDifficulty,
-                    maxAttempts: newQMaxAttempts
+                    maxAttempts: newQMaxAttempts,
+                    hints
                 });
                 showToast('Question Added!', 'success');
             }
-            // Reset Form
             setNewQText('');
-            setNewQImage('');
             setNewQAnswer('');
             setNewQDifficulty('Medium');
             setNewQMaxAttempts(1);
+            setNewQHints(['', '']);
+            setNewQLinks([]);
             fetchData();
         } catch (err) {
             showToast('Failed to save question', 'error');
@@ -196,20 +222,23 @@ export default function AdminPage() {
     const handleEditQuestion = (q: Question) => {
         setEditingQId(q._id);
         setNewQText(q.text);
-        setNewQImage(q.image || '');
+        setNewQLinks(q.links || []);
         setNewQAnswer(q.correctAnswer);
         setNewQDifficulty(q.difficulty || 'Medium');
         setNewQMaxAttempts(q.maxAttempts || 1);
-        window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to form
+        const h = q.hints || [];
+        setNewQHints([h[0] || '', h[1] || '', h[2] || '']);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const cancelEdit = () => {
         setEditingQId(null);
         setNewQText('');
-        setNewQImage('');
+        setNewQLinks([]);
         setNewQAnswer('');
         setNewQDifficulty('Medium');
         setNewQMaxAttempts(1);
+        setNewQHints(['', '']);
     };
 
     const handleToggleQuiz = async () => {
@@ -311,72 +340,91 @@ export default function AdminPage() {
             return durationA - durationB;
         });
 
-    if (loading || !user) return <div className="p-8 text-white min-h-screen flex items-center justify-center">Loading Control Panel...</div>;
+    if (loading || !user) return <div className="p-8 min-h-screen flex items-center justify-center" style={{ color: 'var(--ink)', fontFamily: 'Georgia, serif', fontSize: '1.2rem' }}>Loading Control Panel...</div>;
 
     return (
         <main className="min-h-screen p-4 md:p-8">
             <div className="max-w-7xl mx-auto">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-white mb-2 flex items-center gap-3">
-                            <FaUserFriends className="text-primary-start" /> Admin Dashboard
+                        <h1 className="text-3xl font-extrabold mb-2 flex items-center gap-3" style={{ color: 'var(--ink)', fontFamily: 'Georgia, serif' }}>
+                            <FaUserFriends style={{ color: 'var(--primary-start)' }} /> Admin Dashboard
                         </h1>
-                        <p className="text-sm text-gray-400 mb-4">Manage competition and view live analytics</p>
+                        <p className="text-sm mb-4" style={{ color: 'var(--ink-faded)' }}>Manage competition and view live analytics</p>
 
                         {/* Quiz Controls */}
-                        <div className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/10 w-fit">
+                        <div className="flex items-center gap-4 p-3 rounded-xl w-fit" style={{ background: 'rgba(196, 124, 53, 0.1)', border: '1px solid rgba(139, 69, 19, 0.2)' }}>
                             <button
                                 onClick={handleToggleQuiz}
-                                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${settings.isLive ? 'bg-error hover:opacity-80 text-white' : 'bg-success hover:opacity-80 text-black'}`}
+                                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all`}
+                                style={settings.isLive
+                                    ? { background: 'var(--error)', color: '#faf3e0' }
+                                    : { background: 'var(--success)', color: '#faf3e0' }
+                                }
                             >
                                 {settings.isLive ? 'STOP QUIZ' : 'START QUIZ'}
                             </button>
                             <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 uppercase font-bold">Duration (mins)</span>
+                                <span className="text-xs uppercase font-bold" style={{ color: 'var(--ink-faded)' }}>Duration (mins)</span>
                                 <input
                                     type="number"
                                     value={settings.duration}
                                     onChange={handleUpdateDuration}
-                                    className="w-16 bg-black/30 border border-white/10 rounded-lg p-2 text-center text-white font-mono font-bold"
+                                    className="w-16 rounded-lg p-2 text-center font-mono font-bold outline-none"
+                                    style={{ background: 'rgba(250, 243, 224, 0.6)', border: '1px solid rgba(139, 69, 19, 0.3)', color: 'var(--ink)' }}
                                 />
                             </div>
-                            <div className="px-4 py-2 bg-black/30 rounded-lg border border-white/10 font-mono font-bold text-lg text-primary-start min-w-[80px] text-center">
+                            <div className="px-4 py-2 rounded-lg font-mono font-bold text-lg min-w-[80px] text-center" style={{ background: 'rgba(250, 243, 224, 0.6)', border: '1px solid rgba(139, 69, 19, 0.25)', color: 'var(--primary-start)' }}>
                                 {timeLeft}
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="flex bg-black/30 p-1.5 rounded-xl border border-white/10 backdrop-blur-md">
+                        <div className="flex p-1.5 rounded-xl backdrop-blur-md" style={{ background: 'rgba(250, 243, 224, 0.5)', border: '1px solid rgba(139, 69, 19, 0.2)' }}>
                             <button
                                 onClick={() => setActiveTab('results')}
-                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'results' ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2`}
+                                style={activeTab === 'results'
+                                    ? { background: 'var(--success)', color: '#faf3e0', boxShadow: '0 2px 8px rgba(74,124,63,0.3)' }
+                                    : { color: 'var(--ink-faded)' }
+                                }
                             >
                                 <FaTrophy /> Leaderboard
                             </button>
                             <button
                                 onClick={() => setActiveTab('questions')}
-                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'questions' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2`}
+                                style={activeTab === 'questions'
+                                    ? { background: 'var(--primary-start)', color: '#faf3e0', boxShadow: '0 2px 8px rgba(139,69,19,0.3)' }
+                                    : { color: 'var(--ink-faded)' }
+                                }
                             >
                                 <FaEdit /> Questions
                             </button>
                             <button
                                 onClick={() => setActiveTab('teams')}
-                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeTab === 'teams' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2`}
+                                style={activeTab === 'teams'
+                                    ? { background: 'var(--accent)', color: '#faf3e0', boxShadow: '0 2px 8px rgba(107,58,42,0.3)' }
+                                    : { color: 'var(--ink-faded)' }
+                                }
                             >
                                 <FaUserFriends /> Teams
                             </button>
                         </div>
                         <button
                             onClick={() => setChangePasswordModal(true)}
-                            className="bg-primary-start/20 hover:bg-primary-start text-primary-start hover:text-white p-3 rounded-xl border border-primary-start/30 transition-all shadow-lg"
+                            className="p-3 rounded-xl transition-all shadow-lg"
+                            style={{ background: 'rgba(139, 69, 19, 0.12)', color: 'var(--primary-start)', border: '1px solid rgba(139, 69, 19, 0.3)' }}
                             title="Change Password"
                         >
                             <FaKey className="text-xl" />
                         </button>
                         <button
                             onClick={logout}
-                            className="bg-error/20 hover:bg-error text-error hover:text-white p-3 rounded-xl border border-error/30 transition-all shadow-lg"
+                            className="p-3 rounded-xl transition-all shadow-lg"
+                            style={{ background: 'rgba(139, 37, 0, 0.1)', color: 'var(--error)', border: '1px solid rgba(139, 37, 0, 0.3)' }}
                             title="Logout"
                         >
                             <FaSignOutAlt className="text-xl" />
@@ -385,83 +433,213 @@ export default function AdminPage() {
                 </header>
 
                 {activeTab === 'results' && (
-                    <div className="glass rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-                            <h2 className="font-bold text-lg text-gray-200">Live Leaderboard (Submitted)</h2>
-                            <button onClick={() => fetchData()} className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 text-sm" disabled={isRefreshing}>
-                                <FaSync className={isRefreshing ? 'animate-spin' : ''} /> Refresh
+                    <div className="glass rounded-2xl overflow-hidden shadow-2xl" style={{ border: '1px solid rgba(139, 69, 19, 0.2)' }}>
+                        <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid rgba(139, 69, 19, 0.15)', background: 'rgba(196, 124, 53, 0.08)' }}>
+                            <div className="flex items-center gap-3">
+                                <h2 className="font-bold text-lg" style={{ color: 'var(--ink)', fontFamily: 'Georgia, serif' }}>Leaderboard</h2>
+                                {settings.isLive && (
+                                    <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full animate-pulse" style={{ background: 'rgba(74,124,63,0.15)', color: 'var(--success)', border: '1px solid rgba(74,124,63,0.3)' }}>
+                                        ● Live · refreshes every 30s
+                                    </span>
+                                )}
+                            </div>
+                            <button onClick={() => fetchResults()} className="transition-colors flex items-center gap-2 text-sm" style={{ color: 'var(--ink-faded)' }} disabled={isRefreshing}>
+                                <FaSync className={isRefreshing ? 'animate-spin' : ''} /> Refresh now
                             </button>
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="text-gray-400 border-b border-white/10 bg-black/20">
-                                        <th className="p-4 pl-6">Rank</th>
-                                        <th className="p-4">Team ID</th>
-                                        <th className="p-4">Score</th>
-                                        <th className="p-4 pr-6">Time Taken</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {leaderboardData.map((team, idx) => (
-                                        <tr key={team.teamId} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                                            <td className="p-4 pl-6 font-bold text-gray-500 group-hover:text-white transition-colors">
-                                                {idx === 0 ? '👑' : `#${idx + 1}`}
-                                            </td>
-                                            <td className="p-4 font-mono text-primary-start font-bold">{team.teamId}</td>
-                                            <td className="p-4 font-bold text-xl">{team.score}</td>
-                                            <td className="p-4 pr-6 text-gray-400 font-mono">
-                                                {formatDuration(calculateDuration(team.startTime, team.endTime))}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        {/* Animated Card Leaderboard */}
+                        <div className="p-4 space-y-2">
+                            {leaderboardData.length === 0 ? (
+                                <div className="p-12 text-center" style={{ color: 'var(--ink-faded)' }}>
+                                    No submitted quizzes yet.
+                                </div>
+                            ) : (() => {
+                                const maxScore = leaderboardData[0]?.score || 1;
+                                // Compute rank changes vs previous snapshot
+                                const rankChanges: Record<string, number> = {};
+                                leaderboardData.forEach((team, idx) => {
+                                    const prevRank = previousRanksRef.current[team.teamId];
+                                    rankChanges[team.teamId] = prevRank !== undefined ? prevRank - idx : 0;
+                                });
+                                // Update ref for next render
+                                leaderboardData.forEach((team, idx) => {
+                                    previousRanksRef.current[team.teamId] = idx;
+                                });
+
+                                const medals = ['👑', '🥈', '🥉'];
+                                const rowColors = [
+                                    'rgba(212,175,55,0.12)',   // gold
+                                    'rgba(192,192,192,0.1)',   // silver
+                                    'rgba(176,103,70,0.1)',    // bronze
+                                ];
+                                const borderColors = [
+                                    'rgba(212,175,55,0.4)',
+                                    'rgba(192,192,192,0.3)',
+                                    'rgba(176,103,70,0.3)',
+                                ];
+
+                                return (
+                                    <AnimatePresence>
+                                        {leaderboardData.map((team, idx) => {
+                                            const delta = rankChanges[team.teamId] ?? 0;
+                                            const scorePercent = maxScore > 0 ? Math.round((team.score / maxScore) * 100) : 0;
+                                            const isTop3 = idx < 3;
+
+                                            return (
+                                                <motion.div
+                                                    key={team.teamId}
+                                                    layoutId={team.teamId}
+                                                    layout
+                                                    initial={{ opacity: 0, x: -20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: 20 }}
+                                                    transition={{ layout: { type: 'spring', stiffness: 300, damping: 30 }, duration: 0.3 }}
+                                                    className="flex items-center gap-4 p-4 rounded-2xl"
+                                                    style={{
+                                                        background: isTop3 ? rowColors[idx] : 'rgba(196,124,53,0.05)',
+                                                        border: `1px solid ${isTop3 ? borderColors[idx] : 'rgba(139,69,19,0.12)'}`,
+                                                    }}
+                                                >
+                                                    {/* Rank */}
+                                                    <div className="w-10 text-center flex-shrink-0">
+                                                        <span className="text-2xl">{medals[idx] || `#${idx + 1}`}</span>
+                                                    </div>
+
+                                                    {/* Team + score bar */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <span className="font-mono font-bold text-base truncate" style={{ color: isTop3 ? 'var(--ink)' : 'var(--primary-start)' }}>
+                                                                {team.teamId}
+                                                            </span>
+                                                            <span className="font-black text-xl font-mono ml-2" style={{ color: 'var(--ink)' }}>
+                                                                {team.score}
+                                                                <span className="text-xs font-normal ml-1" style={{ color: 'var(--ink-faded)' }}>pts</span>
+                                                            </span>
+                                                        </div>
+                                                        {/* Score bar */}
+                                                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,69,19,0.1)' }}>
+                                                            <motion.div
+                                                                initial={{ width: 0 }}
+                                                                animate={{ width: `${scorePercent}%` }}
+                                                                transition={{ duration: 0.6, ease: 'easeOut' }}
+                                                                className="h-full rounded-full"
+                                                                style={{
+                                                                    background: isTop3
+                                                                        ? ['linear-gradient(90deg,#D4AF37,#f5d060)', 'linear-gradient(90deg,#aaa,#ddd)', 'linear-gradient(90deg,#b06746,#d4926c)'][idx]
+                                                                        : 'linear-gradient(90deg, var(--primary-start), var(--primary-end))'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Rank change + time */}
+                                                    <div className="flex flex-col items-end gap-1 flex-shrink-0 text-right">
+                                                        {/* Rank delta */}
+                                                        <AnimatePresence mode="wait">
+                                                            {delta !== 0 && (
+                                                                <motion.span
+                                                                    key={`${team.teamId}-${delta}`}
+                                                                    initial={{ opacity: 0, y: delta > 0 ? 8 : -8 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    exit={{ opacity: 0 }}
+                                                                    transition={{ duration: 0.4 }}
+                                                                    className="text-xs font-bold"
+                                                                    style={{ color: delta > 0 ? 'var(--success)' : 'var(--error)' }}
+                                                                >
+                                                                    {delta > 0 ? `↑${delta}` : `↓${Math.abs(delta)}`}
+                                                                </motion.span>
+                                                            )}
+                                                        </AnimatePresence>
+                                                        {/* Time */}
+                                                        <span className="text-xs font-mono" style={{ color: 'var(--ink-faded)' }}>
+                                                            ⏱ {formatDuration(calculateDuration(team.startTime, team.endTime))}
+                                                        </span>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </AnimatePresence>
+                                );
+                            })()}
                         </div>
-                        {leaderboardData.length === 0 && <div className="p-12 text-center text-gray-500">No submitted quizzes yet.</div>}
+
                     </div>
                 )}
 
                 {activeTab === 'questions' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Form */}
-                        <div className="glass p-6 rounded-2xl shadow-xl h-fit border border-white/10 sticky top-4">
-                            <h3 className="text-xl font-bold mb-6 text-blue-300 flex items-center gap-2">
+                        <div className="glass p-6 rounded-2xl shadow-xl h-fit sticky top-4" style={{ border: '1px solid rgba(139, 69, 19, 0.2)' }}>
+                            <h3 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'var(--primary-start)', fontFamily: 'Georgia, serif' }}>
                                 {editingQId ? <><FaEdit className="text-sm" /> Edit Question</> : <><FaPlus className="text-sm" /> Add New Question</>}
                             </h3>
                             <form onSubmit={handleAddQuestion} className="space-y-5">
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Question Text</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--ink-faded)' }}>Question Text</label>
                                     <textarea
                                         value={newQText}
                                         onChange={e => setNewQText(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-start focus:bg-black/50 outline-none transition-all text-sm"
+                                        className="w-full rounded-xl p-3 outline-none transition-all text-sm"
+                                        style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                                         rows={4}
                                         placeholder="Enter question here..."
                                         required
                                     />
                                 </div>
+                                {/* Help Links Section */}
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Image URL (Optional)</label>
-                                    <input
-                                        type="text"
-                                        value={newQImage}
-                                        onChange={e => setNewQImage(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-start focus:bg-black/50 outline-none transition-all text-sm mb-2"
-                                        placeholder="https://example.com/image.jpg"
-                                    />
-                                    {newQImage && (
-                                        <div className="w-full h-32 rounded-lg bg-black/50 overflow-hidden border border-white/10">
-                                            <img src={newQImage} alt="Preview" className="w-full h-full object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                                        </div>
-                                    )}
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--ink-faded)' }}>🔗 Reference Links (Optional)</label>
+                                    <p className="text-xs mb-3" style={{ color: 'var(--ink-faded)' }}>Add clickable reference links participants can open from the question</p>
+                                    <div className="space-y-2 mb-2">
+                                        {newQLinks.map((link, i) => (
+                                            <div key={i} className="flex gap-2 items-center">
+                                                <input
+                                                    type="text"
+                                                    value={link.label}
+                                                    onChange={e => {
+                                                        const updated = [...newQLinks];
+                                                        updated[i] = { ...updated[i], label: e.target.value };
+                                                        setNewQLinks(updated);
+                                                    }}
+                                                    className="w-28 flex-shrink-0 rounded-lg p-2 outline-none text-xs font-bold"
+                                                    style={{ background: 'rgba(196,124,53,0.12)', border: '1px solid rgba(196,124,53,0.35)', color: 'var(--ink)' }}
+                                                    placeholder="Label"
+                                                />
+                                                <input
+                                                    type="url"
+                                                    value={link.url}
+                                                    onChange={e => {
+                                                        const updated = [...newQLinks];
+                                                        updated[i] = { ...updated[i], url: e.target.value };
+                                                        setNewQLinks(updated);
+                                                    }}
+                                                    className="flex-1 rounded-lg p-2 outline-none text-xs"
+                                                    style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
+                                                    placeholder="https://..."
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNewQLinks(newQLinks.filter((_, j) => j !== i))}
+                                                    className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
+                                                    style={{ background: 'rgba(139,37,0,0.1)', color: 'var(--error)' }}
+                                                >×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewQLinks([...newQLinks, { label: '', url: '' }])}
+                                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+                                        style={{ background: 'rgba(196,124,53,0.1)', border: '1px dashed rgba(196,124,53,0.4)', color: 'var(--primary-end)' }}
+                                    >+ Add Link</button>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Difficulty</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--ink-faded)' }}>Difficulty</label>
                                     <select
                                         value={newQDifficulty}
                                         onChange={e => setNewQDifficulty(e.target.value as any)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-start focus:bg-black/50 outline-none transition-all text-sm text-gray-300"
+                                        className="w-full rounded-xl p-3 outline-none transition-all text-sm"
+                                        style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                                     >
                                         <option value="Easy">Easy (25 pts)</option>
                                         <option value="Medium">Medium (50 pts)</option>
@@ -469,32 +647,61 @@ export default function AdminPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Correct Answer</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--ink-faded)' }}>Correct Answer</label>
                                     <input
                                         type="text"
                                         value={newQAnswer}
                                         onChange={e => setNewQAnswer(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-success focus:bg-black/50 outline-none transition-all text-sm font-bold text-success"
+                                        className="w-full rounded-xl p-3 outline-none transition-all text-sm font-bold"
+                                        style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(74,124,63,0.4)', color: 'var(--success)' }}
                                         placeholder="Enter correct answer..."
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Max Attempts</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--ink-faded)' }}>Max Attempts</label>
                                     <input
                                         type="number"
                                         min="1"
                                         value={newQMaxAttempts}
                                         onChange={e => setNewQMaxAttempts(parseInt(e.target.value))}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 focus:border-primary-end focus:bg-black/50 outline-none transition-all text-sm text-gray-300 font-mono"
+                                        className="w-full rounded-xl p-3 outline-none transition-all text-sm font-mono"
+                                        style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                                     />
                                 </div>
+                                {/* Dynamic Hint Fields */}
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--ink-faded)' }}>💡 Hints</label>
+                                    <p className="text-xs mb-3" style={{ color: 'var(--ink-faded)' }}>
+                                        {newQDifficulty === 'Easy' ? '1 hint (Easy)' : newQDifficulty === 'Medium' ? '2 hints (Medium)' : '3 hints (Hard)'}
+                                        {' · '}Hint 1: <span style={{ color: 'var(--error)', fontWeight: 'bold' }}>−5 pts</span>
+                                        {newQDifficulty !== 'Easy' && <>, Hint 2: <span style={{ color: 'var(--error)', fontWeight: 'bold' }}>−10 pts</span></>}
+                                        {newQDifficulty === 'Hard' && <>, Hint 3: <span style={{ color: 'var(--error)', fontWeight: 'bold' }}>−15 pts</span></>}
+                                    </p>
+                                    <div className="space-y-2">
+                                        {Array.from({ length: newQDifficulty === 'Easy' ? 1 : newQDifficulty === 'Medium' ? 2 : 3 }).map((_, i) => (
+                                            <input
+                                                key={i}
+                                                type="text"
+                                                value={newQHints[i] || ''}
+                                                onChange={e => {
+                                                    const updated = [...newQHints];
+                                                    updated[i] = e.target.value;
+                                                    setNewQHints(updated);
+                                                }}
+                                                className="w-full rounded-xl p-3 outline-none transition-all text-sm"
+                                                style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(196,124,53,0.3)', color: 'var(--ink)' }}
+                                                placeholder={`Hint ${i + 1}...`}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
                                 <div className="flex gap-2 mt-4">
-                                    <button type="submit" className={`flex-1 ${editingQId ? 'bg-gradient-to-r from-yellow-600 to-orange-600' : 'bg-gradient-to-r from-primary-start to-primary-end'} hover:opacity-90 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2`}>
+                                    <button type="submit" className="flex-1 hover:opacity-90 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2" style={{ background: editingQId ? 'linear-gradient(135deg, #c47c35, #8B4513)' : 'linear-gradient(135deg, var(--primary-start), var(--primary-end))', color: '#faf3e0' }}>
                                         {editingQId ? <><FaSave /> Update</> : <><FaPlus /> Create</>}
                                     </button>
                                     {editingQId && (
-                                        <button type="button" onClick={cancelEdit} className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-xl font-bold transition-all">
+                                        <button type="button" onClick={cancelEdit} className="px-4 rounded-xl font-bold transition-all" style={{ background: 'rgba(92,61,30,0.2)', color: 'var(--ink)' }}>
                                             <FaTimes />
                                         </button>
                                     )}
@@ -505,45 +712,55 @@ export default function AdminPage() {
                         {/* List */}
                         <div className="lg:col-span-2 space-y-4">
                             <div className="flex justify-between items-center mb-2">
-                                <h3 className="text-xl font-bold text-gray-300 flex items-center gap-2">
+                                <h3 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--ink)', fontFamily: 'Georgia, serif' }}>
                                     <FaClipboardList /> Library ({questions.length})
                                 </h3>
                             </div>
                             {questions.map((q, idx) => (
-                                <div key={q._id} className={`glass p-5 rounded-xl border hover:border-white/20 transition-all group relative ${editingQId === q._id ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-white/5'}`}>
+                                <div key={q._id} className="glass p-5 rounded-xl transition-all group relative" style={{ border: editingQId === q._id ? '1px solid rgba(196, 124, 53, 0.6)' : '1px solid rgba(139,69,19,0.15)' }}>
                                     <div className="flex justify-between items-start mb-3">
-                                        <span className="font-mono text-xs text-primary-start font-bold">Q{idx + 1}</span>
+                                        <span className="font-mono text-xs font-bold" style={{ color: 'var(--primary-start)' }}>Q{idx + 1}</span>
                                         <div className="flex items-center gap-2">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${q.difficulty === 'Easy' ? 'bg-success/10 text-success border-success/20' :
-                                                q.difficulty === 'Medium' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                                                    'bg-error/10 text-error border-error/20'
-                                                }`}>{q.difficulty || 'Medium'}</span>
-                                            <span className="text-xs text-gray-500 font-mono border border-white/5 px-2 py-0.5 rounded-full">
+                                            <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: q.difficulty === 'Easy' ? 'rgba(74,124,63,0.12)' : q.difficulty === 'Medium' ? 'rgba(196,124,53,0.12)' : 'rgba(139,37,0,0.12)', color: q.difficulty === 'Easy' ? 'var(--success)' : q.difficulty === 'Medium' ? 'var(--primary-end)' : 'var(--error)', border: q.difficulty === 'Easy' ? '1px solid rgba(74,124,63,0.3)' : q.difficulty === 'Medium' ? '1px solid rgba(196,124,53,0.3)' : '1px solid rgba(139,37,0,0.3)' }}>{q.difficulty || 'Medium'}</span>
+                                            <span className="text-xs font-mono px-2 py-0.5 rounded-full" style={{ color: 'var(--ink-faded)', border: '1px solid rgba(139,69,19,0.15)' }}>
                                                 Tries: {q.maxAttempts || 1}
                                             </span>
                                             <button
                                                 onClick={() => handleEditQuestion(q)}
-                                                className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10 transition-colors"
+                                                className="p-1.5 rounded-lg transition-colors"
+                                                style={{ background: 'rgba(196,124,53,0.1)', color: 'var(--ink-faded)' }}
                                             >
                                                 <FaEdit size={14} />
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteQuestion(q._id)}
-                                                className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-error hover:bg-error/10 transition-colors"
+                                                className="p-1.5 rounded-lg transition-colors"
+                                                style={{ background: 'rgba(139,37,0,0.08)', color: 'var(--error)' }}
                                             >
                                                 <FaTrash size={14} />
                                             </button>
                                         </div>
                                     </div>
-                                    {q.image && (
-                                        <div className="mb-4 rounded-lg overflow-hidden border border-white/10 max-h-48 bg-black/50">
-                                            <img src={q.image} alt="Question Image" className="w-full h-full object-contain" />
+                                    <p className="font-semibold mb-3 text-lg leading-snug" style={{ color: 'var(--ink)' }}>{q.text}</p>
+                                    {q.links && q.links.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                            {q.links.map((link, li) => (
+                                                <a
+                                                    key={li}
+                                                    href={link.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full transition-all hover:opacity-80"
+                                                    style={{ background: 'rgba(196,124,53,0.12)', border: '1px solid rgba(196,124,53,0.3)', color: 'var(--primary-end)' }}
+                                                >
+                                                    🔗 {link.label || ''}
+                                                </a>
+                                            ))}
                                         </div>
                                     )}
-                                    <p className="font-semibold mb-4 text-gray-200 text-lg leading-snug">{q.text}</p>
-                                    <div className="bg-success/10 border border-success/20 p-3 rounded-lg">
-                                        <span className="text-xs text-success font-bold uppercase block mb-1">Correct Answer</span>
-                                        <span className="text-success font-mono">{q.correctAnswer}</span>
+                                    <div className="p-3 rounded-lg" style={{ background: 'rgba(74,124,63,0.1)', border: '1px solid rgba(74,124,63,0.25)' }}>
+                                        <span className="text-xs font-bold uppercase block mb-1" style={{ color: 'var(--success)' }}>Correct Answer</span>
+                                        <span className="font-mono" style={{ color: 'var(--success)' }}>{q.correctAnswer}</span>
                                     </div>
                                 </div>
                             ))}
@@ -553,61 +770,65 @@ export default function AdminPage() {
 
                 {activeTab === 'teams' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="glass p-8 rounded-2xl shadow-xl border border-white/10 h-fit">
-                            <h3 className="text-2xl font-bold mb-6 text-purple-300 flex items-center gap-2">
+                        <div className="glass p-8 rounded-2xl shadow-xl h-fit" style={{ border: '1px solid rgba(139, 69, 19, 0.2)' }}>
+                            <h3 className="text-2xl font-bold mb-6 flex items-center gap-2" style={{ color: 'var(--accent)', fontFamily: 'Georgia, serif' }}>
                                 <FaPlus className="text-sm" /> Register New Team
                             </h3>
                             <form onSubmit={handleAddTeam} className="space-y-6">
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Team ID / Username</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--ink-faded)' }}>Team ID / Username</label>
                                     <input
                                         type="text"
                                         value={newTeamId}
                                         onChange={e => setNewTeamId(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-4 focus:border-purple-500 focus:bg-black/50 outline-none transition-all text-lg font-mono tracking-wide"
+                                        className="w-full rounded-xl p-4 outline-none transition-all text-lg font-mono tracking-wide"
+                                        style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                                         placeholder="e.g. TEAM05"
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Access Password</label>
+                                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--ink-faded)' }}>Access Password</label>
                                     <input
                                         type="text"
                                         value={newTeamPassword}
                                         onChange={e => setNewTeamPassword(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-4 focus:border-purple-500 focus:bg-black/50 outline-none transition-all text-lg font-mono tracking-wide"
+                                        className="w-full rounded-xl p-4 outline-none transition-all text-lg font-mono tracking-wide"
+                                        style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                                         placeholder="e.g. team05_pass"
                                         required
                                     />
                                 </div>
 
-                                <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 py-4 rounded-xl font-bold shadow-lg shadow-purple-900/40 transition-all mt-4 text-lg">
+                                <button type="submit" className="w-full py-4 rounded-xl font-bold shadow-lg transition-all mt-4 text-lg" style={{ background: 'linear-gradient(135deg, var(--accent), var(--primary-start))', color: '#faf3e0', boxShadow: '0 4px 15px rgba(107,58,42,0.3)' }}>
                                     Generate Credentials
                                 </button>
                             </form>
                         </div>
 
-                        <div className="glass p-6 rounded-2xl shadow-xl border border-white/10">
+                        <div className="glass p-6 rounded-2xl shadow-xl" style={{ border: '1px solid rgba(139,69,19,0.2)' }}>
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-gray-200">All Teams Status</h3>
-                                <button onClick={() => fetchData()} className="text-xs text-gray-400 hover:text-white flex items-center gap-1" disabled={isRefreshing}>
+                                <h3 className="text-xl font-bold" style={{ color: 'var(--ink)', fontFamily: 'Georgia, serif' }}>All Teams Status</h3>
+                                <button onClick={() => fetchData()} className="text-xs flex items-center gap-1" style={{ color: 'var(--ink-faded)' }} disabled={isRefreshing}>
                                     <FaSync className={isRefreshing ? 'animate-spin' : ''} /> Refresh
                                 </button>
                             </div>
                             <div className="space-y-3">
                                 {results.map((team) => (
-                                    <div key={team.teamId} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/20 transition-all group">
-                                        <div className="font-mono text-lg font-bold text-primary-end">{team.teamId}</div>
+                                    <div key={team.teamId} className="flex items-center justify-between p-4 rounded-xl transition-all group" style={{ background: 'rgba(196,124,53,0.06)', border: '1px solid rgba(139,69,19,0.1)' }}>
+                                        <div className="font-mono text-lg font-bold" style={{ color: 'var(--primary-end)' }}>{team.teamId}</div>
                                         <div className="flex items-center gap-3">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border capitalize ${team.quizStatus === 'submitted' ? 'bg-success/10 text-success border-success/20' :
-                                                team.quizStatus === 'in_progress' ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20' :
-                                                    'bg-gray-700/50 text-gray-400 border-gray-600'
-                                                }`}>
+                                            <span className="px-3 py-1 rounded-full text-xs font-bold capitalize" style={{
+                                                background: team.quizStatus === 'submitted' ? 'rgba(74,124,63,0.12)' : team.quizStatus === 'in_progress' ? 'rgba(196,124,53,0.12)' : 'rgba(92,61,30,0.08)',
+                                                color: team.quizStatus === 'submitted' ? 'var(--success)' : team.quizStatus === 'in_progress' ? 'var(--primary-end)' : 'var(--ink-faded)',
+                                                border: team.quizStatus === 'submitted' ? '1px solid rgba(74,124,63,0.3)' : team.quizStatus === 'in_progress' ? '1px solid rgba(196,124,53,0.3)' : '1px solid rgba(92,61,30,0.2)'
+                                            }}>
                                                 {team.quizStatus.replace('_', ' ')}
                                             </span>
                                             <button
                                                 onClick={() => handleDeleteTeam(team._id, team.teamId)}
-                                                className="p-2 rounded-lg text-gray-500 hover:text-error hover:bg-error/20 transition-colors opacity-0 group-hover:opacity-100"
+                                                className="p-2 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                style={{ color: 'var(--error)', background: 'rgba(139,37,0,0.08)' }}
                                                 title="Delete Team"
                                             >
                                                 <FaTrash />
@@ -615,7 +836,7 @@ export default function AdminPage() {
                                         </div>
                                     </div>
                                 ))}
-                                {results.length === 0 && <p className="text-gray-500 text-center text-sm">No teams registered.</p>}
+                                {results.length === 0 && <p className="text-center text-sm" style={{ color: 'var(--ink-faded)' }}>No teams registered.</p>}
                             </div>
                         </div>
                     </div>
@@ -639,13 +860,15 @@ export default function AdminPage() {
                     <>
                         <button
                             onClick={closeConfirm}
-                            className="px-4 py-2 rounded-lg text-gray-400 hover:bg-white/5 transition-colors"
+                            className="px-4 py-2 rounded-lg transition-colors"
+                            style={{ color: 'var(--ink-faded)', background: 'rgba(139,69,19,0.08)' }}
                         >
                             Cancel
                         </button>
                         <button
                             onClick={confirmModal.onConfirm}
-                            className="px-4 py-2 rounded-lg bg-error hover:bg-red-500 text-white font-bold transition-colors shadow-lg"
+                            className="px-4 py-2 rounded-lg font-bold transition-colors shadow-lg"
+                            style={{ background: 'var(--error)', color: '#faf3e0' }}
                         >
                             Confirm
                         </button>
@@ -663,32 +886,35 @@ export default function AdminPage() {
             >
                 <form onSubmit={handleChangePassword} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Current Password</label>
+                        <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--ink-faded)' }}>Current Password</label>
                         <input
                             type="password"
                             value={passwordData.currentPassword}
                             onChange={e => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary-start transition-colors"
+                            className="w-full rounded-lg p-3 outline-none transition-colors"
+                            style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">New Password</label>
+                        <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--ink-faded)' }}>New Password</label>
                         <input
                             type="password"
                             value={passwordData.newPassword}
                             onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary-start transition-colors"
+                            className="w-full rounded-lg p-3 outline-none transition-colors"
+                            style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Confirm New Password</label>
+                        <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--ink-faded)' }}>Confirm New Password</label>
                         <input
                             type="password"
                             value={passwordData.confirmPassword}
                             onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary-start transition-colors"
+                            className="w-full rounded-lg p-3 outline-none transition-colors"
+                            style={{ background: 'rgba(250,243,224,0.5)', border: '1px solid rgba(139,69,19,0.25)', color: 'var(--ink)' }}
                             required
                         />
                     </div>
@@ -696,13 +922,15 @@ export default function AdminPage() {
                         <button
                             type="button"
                             onClick={() => setChangePasswordModal(false)}
-                            className="flex-1 py-3 rounded-lg text-gray-400 hover:bg-white/5 font-bold transition-colors"
+                            className="flex-1 py-3 rounded-lg font-bold transition-colors"
+                            style={{ color: 'var(--ink-faded)', background: 'rgba(139,69,19,0.08)' }}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 py-3 rounded-lg bg-primary-start hover:bg-blue-500 text-white font-bold transition-colors shadow-lg"
+                            className="flex-1 py-3 rounded-lg font-bold transition-colors shadow-lg"
+                            style={{ background: 'linear-gradient(135deg, var(--primary-start), var(--primary-end))', color: '#faf3e0' }}
                         >
                             Update Password
                         </button>

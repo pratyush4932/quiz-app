@@ -1,12 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0A0A23;
-  --foreground: #F8FAFC;
-  --primary-start: #3A86FF;
-  --primary-end: #8338EC;
-  --success: #9EF01A;
-  --error: #FF6B6B;
+  --background: #f5e6c8;
+  --foreground: #2c1a0e;
+  --primary-start: #8B4513;
+  --primary-end: #c47c35;
+  --accent: #6b3a2a;
+  --parchment-light: #faf3e0;
+  --parchment-mid: #e8d5a3;
+  --parchment-dark: #c9a96e;
+  --ink: #2c1a0e;
+  --ink-light: #5c3d1e;
+  --ink-faded: #8b6914;
+  --success: #4a7c3f;
+  --error: #8B2500;
+  --border-color: rgba(139, 69, 19, 0.3);
 }
 
 @theme inline {
@@ -23,15 +31,45 @@
 }
 
 body {
-  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
-  /* subtle gradient overlay */
+  background-color: var(--parchment-light);
   background-image:
-    radial-gradient(circle at 15% 50%, rgba(58, 134, 255, 0.08), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(131, 56, 236, 0.08), transparent 25%);
+    /* Noise texture overlay */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E"),
+    /* Large compass rose watermark */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' width='500' height='500'%3E%3Cg opacity='0.06' fill='%238B4513' transform='translate(100,100)'%3E%3Ccircle r='70' fill='none' stroke='%238B4513' stroke-width='2'/%3E%3Ccircle r='55' fill='none' stroke='%238B4513' stroke-width='1'/%3E%3Cpolygon points='0,-80 8,-20 0,-30 -8,-20' fill='%238B4513'/%3E%3Cpolygon points='0,80 8,20 0,30 -8,20' fill='%238B4513'/%3E%3Cpolygon points='-80,0 -20,8 -30,0 -20,-8' fill='%238B4513'/%3E%3Cpolygon points='80,0 20,8 30,0 20,-8' fill='%238B4513'/%3E%3Cpolygon points='-57,-57 -10,-20 -20,-30 -20,-10' fill='%238B4513'/%3E%3Cpolygon points='57,57 10,20 20,30 20,10' fill='%238B4513'/%3E%3Cpolygon points='57,-57 20,-10 30,-20 10,-20' fill='%238B4513'/%3E%3Cpolygon points='-57,57 -20,10 -30,20 -10,20' fill='%238B4513'/%3E%3Ccircle r='12' fill='%23faf3e0' stroke='%238B4513' stroke-width='2'/%3E%3Ccircle r='5' fill='%238B4513'/%3E%3C/g%3E%3C/svg%3E"),
+    /* Radial warm glow center */
+    radial-gradient(ellipse at 30% 25%, rgba(196, 124, 53, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 75% 70%, rgba(139, 69, 19, 0.18) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 50%, rgba(250, 243, 224, 1) 0%, rgba(232, 213, 163, 0.8) 50%, rgba(201, 169, 110, 0.9) 100%);
+  background-size: 200px 200px, 600px 600px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, center center, 0 0, 0 0, 0 0;
+  background-attachment: fixed;
+}
+
+/* Aged paper corner stains via body pseudo-elements replacement - use parchment overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    /* Top-left brown stain */
+    radial-gradient(ellipse at 5% 5%, rgba(101, 55, 0, 0.22) 0%, transparent 30%),
+    /* Top-right stain */
+    radial-gradient(ellipse at 95% 3%, rgba(139, 69, 19, 0.18) 0%, transparent 25%),
+    /* Bottom-left stain */
+    radial-gradient(ellipse at 3% 95%, rgba(139, 69, 19, 0.15) 0%, transparent 25%),
+    /* Bottom-right darker corner */
+    radial-gradient(ellipse at 97% 97%, rgba(101, 55, 0, 0.2) 0%, transparent 30%),
+    /* Center fold line */
+    linear-gradient(to right, transparent 49.5%, rgba(139, 69, 19, 0.06) 49.5%, rgba(139, 69, 19, 0.06) 50.5%, transparent 50.5%),
+    /* Horizontal fold */
+    linear-gradient(to bottom, transparent 49.5%, rgba(139, 69, 19, 0.04) 49.5%, rgba(139, 69, 19, 0.04) 50.5%, transparent 50.5%);
 }
 
 /* Custom Scrollbar */
@@ -40,25 +78,45 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(139, 69, 19, 0.1);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(139, 69, 19, 0.4);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(139, 69, 19, 0.6);
 }
 
-/* Glassmorphism Utilities - Updated for cleaner look */
+/* Glassmorphism / Parchment Card Style */
 .glass {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  background: rgba(250, 243, 224, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 69, 19, 0.25);
+  box-shadow:
+    0 8px 32px 0 rgba(101, 55, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Parchment-style input fields */
+.parchment-input {
+  background: rgba(250, 243, 224, 0.5);
+  border: 1px solid rgba(139, 69, 19, 0.3);
+  color: var(--ink);
+}
+
+.parchment-input::placeholder {
+  color: rgba(92, 61, 30, 0.5);
+}
+
+.parchment-input:focus {
+  background: rgba(250, 243, 224, 0.8);
+  border-color: var(--primary-start);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.15);
 }
 
 /* Hide Next.js Dev Overlay/Indicators/Tools */

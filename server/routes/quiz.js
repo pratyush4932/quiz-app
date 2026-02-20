@@ -111,6 +111,9 @@ router.post('/attempt', auth, async (req, res) => {
 router.get('/start', auth, async (req, res) => {
     try {
         const team = await Team.findById(req.user.id);
+        if (!team) {
+            return res.status(404).json({ msg: 'Team not found.' });
+        }
         if (team.quizStatus === 'submitted') {
             return res.status(400).json({ msg: 'Quiz already submitted.' });
         }
@@ -130,11 +133,12 @@ router.get('/start', auth, async (req, res) => {
         const processedQuestions = shuffledQuestions.map(q => ({
             _id: q._id,
             text: q.text,
-            image: q.image,
+            links: q.links || [],
             difficulty: q.difficulty,
             category: q.category,
             marks: q.difficulty === 'Easy' ? 25 : q.difficulty === 'Medium' ? 50 : 100,
-            maxAttempts: q.maxAttempts || 1
+            maxAttempts: q.maxAttempts || 1,
+            hints: q.hints || []
         }));
 
         // Update Team status
@@ -151,6 +155,7 @@ router.get('/start', auth, async (req, res) => {
                 userState[a.questionId] = {
                     attemptsUsed: a.attemptsUsed,
                     isCorrect: a.isCorrect,
+                    hintsUsed: a.hintsUsed || 0,
                     isLocked: a.isCorrect || a.attemptsUsed >= (questions.find(q => q._id.toString() === a.questionId.toString())?.maxAttempts || 1)
                 };
             });
@@ -159,9 +164,64 @@ router.get('/start', auth, async (req, res) => {
         res.json({
             questions: processedQuestions,
             duration: settings.duration,
-            startTime: settings.startTime, // Use Global Start Time
-            userState
+            startTime: settings.startTime,
+            userState,
+            score: team.score
         });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   POST api/quiz/hint
+// @desc    Reveal next hint for a question (-5 points)
+// @access  Private (Team)
+router.post('/hint', auth, async (req, res) => {
+    try {
+        const { questionId, hintIndex } = req.body;
+        const team = await Team.findById(req.user.id);
+        const question = await Question.findById(questionId);
+
+        if (!team || !question) {
+            return res.status(404).json({ msg: 'Team or Question not found' });
+        }
+
+        if (team.quizStatus === 'submitted') {
+            return res.status(400).json({ msg: 'Quiz already submitted.' });
+        }
+
+        const maxHints = question.difficulty === 'Easy' ? 1 : question.difficulty === 'Medium' ? 2 : 3;
+        const hints = question.hints || [];
+
+        if (hintIndex >= maxHints || hintIndex >= hints.length) {
+            return res.status(400).json({ msg: 'No more hints available.' });
+        }
+
+        // Find or create answer record
+        let answerIndex = team.answers.findIndex(a => a.questionId.toString() === questionId);
+        if (answerIndex === -1) {
+            team.answers.push({ questionId: question._id, answerText: '', attemptsUsed: 0, isCorrect: false, hintsUsed: 0 });
+            answerIndex = team.answers.length - 1;
+        }
+
+        const storedAnswer = team.answers[answerIndex];
+
+        // Only deduct if this hintIndex hasn't been revealed before
+        if (hintIndex >= (storedAnswer.hintsUsed || 0)) {
+            storedAnswer.hintsUsed = hintIndex + 1;
+            const deduction = (hintIndex + 1) * 5; // hint1=-5, hint2=-10, hint3=-15
+            team.score = Math.max(0, (team.score || 0) - deduction);
+        }
+
+        await team.save();
+
+        res.json({
+            hint: hints[hintIndex],
+            hintsUsed: storedAnswer.hintsUsed,
+            newScore: team.score
+        });
+
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
@@ -174,9 +234,12 @@ router.get('/start', auth, async (req, res) => {
 router.post('/submit', auth, async (req, res) => {
     try {
         const team = await Team.findById(req.user.id);
-
+        if (!team) {
+            return res.status(404).json({ msg: 'Team not found.' });
+        }
         if (team.quizStatus === 'submitted') {
-            return res.status(400).json({ msg: 'Quiz already submitted.' });
+            // Already submitted — return the existing score gracefully instead of erroring
+            return res.json({ msg: 'Quiz already submitted.', score: team.score });
         }
 
         team.quizStatus = 'submitted';

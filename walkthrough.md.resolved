@@ -1,0 +1,284 @@
+# 🧭 Quiz App — Full Project Walkthrough
+
+## Overview
+
+A **real-time competitive quiz platform** built for in-person or online events. Teams log in with credentials, answer timed MCQ/open-answer questions, and their scores are tracked live on an animated admin leaderboard. The admin controls everything — quiz start/stop, question management, team registration — from a dedicated dashboard.
+
+```
+mcq/
+├── server/        → Node.js + Express + MongoDB backend (port 5000)
+└── client/        → Next.js 14 frontend (port 3000, served via ngrok)
+```
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph LR
+    A["Participants (browser)"] -- "HTTPS via ngrok" --> B["Next.js Client :3000"]
+    C["Admin (browser)"] -- "HTTPS via ngrok" --> B
+    B -- "Axios + JWT" --> D["Express API :5000"]
+    D -- "Mongoose" --> E["MongoDB Atlas (free tier)"]
+```
+
+**Auth flow:** JWT tokens are stored in `localStorage`, automatically attached to every API call via an Axios request interceptor. Two roles exist: `team` and [admin](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/middleware/authMiddleware.js#16-29), enforced server-side by middleware.
+
+---
+
+## 🗄️ Backend — `server/`
+
+### Entry Point — [server.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/server.js)
+
+- Starts Express on port `5000` (or `process.env.PORT`)
+- Applies CORS + JSON body parsing middleware
+- Mounts 3 route groups:
+  - `/api/auth` — login for teams & admin
+  - `/api/quiz` — quiz gameplay actions
+  - `/api/admin` — admin control panel actions
+- Connects to MongoDB Atlas via `MONGO_URI` env variable
+
+---
+
+### 📦 Database Models
+
+#### [Question.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/models/Question.js)
+| Field | Type | Description |
+|---|---|---|
+| [text](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/context/AuthContext.tsx#14-20) | String (required) | The question body |
+| `links` | `[{label, url}]` | Clickable reference links shown to participants |
+| `correctAnswer` | String (required) | Case-insensitive answer to match against |
+| `difficulty` | `Easy` / `Medium` / `Hard` | Controls marks & number of hints |
+| `maxAttempts` | Number (default 1) | How many answer tries per question |
+| `hints` | `[String]` | Array of hint strings (1 for Easy, 2 for Medium, 3 for Hard) |
+| `category` | String | Organisational tag (e.g. "Science") |
+
+#### [Team.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/models/Team.js)
+| Field | Type | Description |
+|---|---|---|
+| `teamId` | String (unique) | Login username |
+| `password` | String | bcrypt-hashed password |
+| `quizStatus` | `not_started` / `in_progress` / `submitted` | State machine |
+| `score` | Number | Cumulative score, updated live |
+| `violationCount` | Number | Tab-switch count; ≥4 = auto-disqualify |
+| `startTime` / `endTime` | Date | Used to calculate completion time for tie-breaking |
+| `answers[]` | subdocument | Per-question: `questionId`, `answerText`, `attemptsUsed`, `isCorrect`, `hintsUsed` |
+
+#### [Settings.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/models/Settings.js)
+Singleton document (one row in the collection).
+| Field | Type | Description |
+|---|---|---|
+| `isLive` | Boolean | Whether quiz is currently running |
+| `duration` | Number (minutes) | Quiz time limit |
+| `startTime` | Date | When the quiz was started (for timer sync) |
+
+#### [Admin.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/models/Admin.js)
+Stores the single admin account: `username` + bcrypt-hashed `password`.
+
+---
+
+### 🔐 Middleware — [authMiddleware.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/middleware/authMiddleware.js)
+
+Two guards:
+- **[auth](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/middleware/authMiddleware.js#3-15)** — verifies JWT, accepts any valid token (used for team routes)
+- **[adminAuth](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/middleware/authMiddleware.js#16-29)** — verifies JWT AND checks `decoded.role === 'admin'` (used for all admin routes)
+
+Both read the token from the `x-auth-token` header.
+
+---
+
+### 🛣️ Routes
+
+#### [auth.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/routes/auth.js)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/auth/login` | Team login — verifies bcrypt password, returns `{token, team}` |
+| `POST` | `/api/auth/admin/login` | Admin login — 4h JWT, returns `{token}` |
+| `GET` | `/api/auth/user` | Returns current team's data (used to restore session) |
+| `PUT` | `/api/auth/admin/update-password` | Admin changes their own password |
+
+> After login, if `quizStatus === 'submitted'`, teams are **blocked** from logging in again.
+
+#### [quiz.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/routes/quiz.js)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/quiz/start` | Fetches shuffled questions (with hints/links, no correct answers). Sets `quizStatus = in_progress` and records `startTime`. |
+| `POST` | `/api/quiz/attempt` | Submits an answer for a question. Validates attempts remaining, checks correctness, updates score. |
+| `POST` | `/api/quiz/hint` | Reveals the next hint for a question. Deducts points: 1st hint −5pts, 2nd −10pts, 3rd −15pts. |
+| `POST` | `/api/quiz/submit` | Finalises quiz. Sets `quizStatus = submitted`, records `endTime`. If already submitted, returns score gracefully (no error). |
+| `POST` | `/api/quiz/violation` | Records a tab-switch. At 4+ violations: auto-submits and returns `action: 'terminate'`. |
+| `GET` | `/api/quiz/info` | Returns current settings (isLive, duration, startTime) for timer sync. |
+
+**Scoring system:**
+- Easy → 25 pts, Medium → 50 pts, Hard → 100 pts per correct answer
+- Hints deduct cumulatively: hint 1 = -5, hint 2 = -10, hint 3 = -15
+- Score can never go below 0
+
+#### [admin.js](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/routes/admin.js)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET/POST/PUT/DELETE` | `/api/admin/questions` | Full CRUD for questions |
+| `GET/POST/DELETE` | `/api/admin/teams` | Create, list, delete teams |
+| `GET` | `/api/admin/results` | All teams' scores, status, times (for leaderboard) |
+| `GET/PUT` | `/api/admin/settings` | Read/update quiz settings (isLive, duration) |
+
+> All admin routes are protected by [adminAuth](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/middleware/authMiddleware.js#16-29) middleware.
+
+---
+
+## 🖥️ Frontend — `client/`
+
+Built with **Next.js 14 App Router**, TypeScript, Framer Motion, and react-icons. Styled entirely in vanilla CSS with a **parchment/quest theme** (warm amber/brown palette).
+
+### Key Files
+
+#### [utils/api.ts](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/utils/api.ts)
+A pre-configured Axios instance:
+- `baseURL` from `NEXT_PUBLIC_API_URL` env var
+- Request interceptor auto-attaches `x-auth-token: <token from localStorage>` to every call
+
+#### [context/AuthContext.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/context/AuthContext.tsx)
+Global auth state provider:
+- Restores session on page load from `localStorage` (`token` + `user` JSON)
+- [login(token, userData)](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/context/AuthContext.tsx#61-68) → saves to localStorage, redirects to `/quiz` or `/admin` based on role
+- [logout()](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/context/AuthContext.tsx#69-75) → clears localStorage, redirects to `/`
+- Exposes `{ user, loading, login, logout }` via [useAuth()](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/context/AuthContext.tsx#83-88) hook
+
+---
+
+### 📄 Pages
+
+#### [app/page.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/app/page.tsx) — Team Login
+- Glass-morphism card with parchment styling
+- Inputs: Team ID + Access Code (password)
+- On success: calls [login(token, team)](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/context/AuthContext.tsx#61-68) → redirects to `/quiz`
+- Error shown as animated slide-in banner
+- "Begin Challenge 🗺️" button with hover shimmer effect
+
+#### [app/quiz/page.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/app/quiz/page.tsx) — Quiz Page
+The main participant experience. State machine:
+
+```
+waiting → (quiz goes live) → in_progress → submitted
+```
+
+**Key features:**
+- **Countdown timer** — synced with server `startTime` from `/api/quiz/info`; auto-submits when it hits 0
+- **Live score badge** in the header, updates when hints are used or answers are correct
+- **Question card** with scrollable text area for long questions
+- **Answer input** — per-question attempt counter, shows remaining tries
+- **Hints section** — reveals hints one by one with cost label (e.g. "💡 Reveal Hint 2/3 · −10 pts")
+- **Reference links** — clickable amber buttons that open external URLs in a new tab
+- **Anti-cheat** — `visibilitychange` event listener records tab switches via `/api/quiz/violation`
+- **Submission** — "Submit Quest" button + timer auto-submit; shows final score on completion screen with confetti
+
+#### [app/admin/page.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/app/admin/page.tsx) — Admin Dashboard
+Three-tab control panel:
+
+**📊 Results tab (default):**
+- **Animated leaderboard** — Framer Motion card list; teams smoothly slide to new positions when ranks change
+- **Medal icons** — 👑🥈🥉 for top 3 with gold/silver/bronze card backgrounds
+- **Rank-change arrows** — ↑2 (green) / ↓1 (red) appear after each auto-refresh
+- **Score bar** — relative progress bar per team, animates on load
+- **Auto-refresh** every 30s only when quiz is live (uses a `useRef` to detect rank changes; stops polling when quiz stops → minimal MongoDB calls)
+- Manual "Refresh now" button
+
+**❓ Questions tab:**
+- Add/Edit/Delete questions
+- Dynamic hint inputs (1/2/3 based on difficulty)
+- **Reference links editor** — add multiple `{label, url}` pairs with "+ Add Link" / × remove
+- Hint cost info shown per difficulty level
+- Question cards show links as clickable amber pills
+
+**👥 Teams tab:**
+- Register new teams (ID + password, auto-hashed)
+- View all teams with status badges
+- Delete teams
+- Admin password change modal
+
+**Header controls:**
+- ⏱ Live countdown timer (synced with server)
+- Start/Stop quiz toggle
+- Duration setting
+- Logout button
+
+---
+
+### 🧩 Components
+
+| Component | Purpose |
+|---|---|
+| [Modal.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/components/Modal.tsx) | Reusable confirm dialog (used for destructive actions) |
+| [Toast.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/components/Toast.tsx) | Auto-dismissing notification banner (success/error/info) |
+| [Celebration.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/components/Celebration.tsx) | Confetti animation shown on quiz submission |
+| [ParticleBackground.tsx](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/components/ParticleBackground.tsx) | Animated floating particles for visual ambience |
+
+---
+
+## 🔄 Complete Data Flow — Team Quiz Session
+
+```mermaid
+sequenceDiagram
+    participant T as Team (Browser)
+    participant API as Express API
+    participant DB as MongoDB
+
+    T->>API: POST /auth/login
+    API->>DB: Find team, bcrypt.compare
+    API-->>T: JWT token
+
+    T->>API: GET /quiz/info
+    API-->>T: {isLive, duration, startTime}
+
+    T->>API: GET /quiz/start
+    API->>DB: Fetch + shuffle questions
+    API->>DB: Set team.quizStatus = in_progress
+    API-->>T: Questions (no answers, with hints & links)
+
+    loop For each question
+        T->>API: POST /quiz/attempt {questionId, answer}
+        API->>DB: Check answer, update score + answers[]
+        API-->>T: {correct, score, attemptsLeft}
+
+        opt Use hint
+            T->>API: POST /quiz/hint {questionId, hintIndex}
+            API->>DB: Deduct points, record hintsUsed
+            API-->>T: {hint, newScore}
+        end
+    end
+
+    T->>API: POST /quiz/submit
+    API->>DB: Set quizStatus=submitted, endTime=now
+    API-->>T: {score}
+```
+
+---
+
+## 🌐 Deployment Setup
+
+| Service | Role |
+|---|---|
+| **MongoDB Atlas** (free tier) | Cloud database — 1 cluster |
+| **ngrok** | Exposes local port 3000 to a public HTTPS URL for participants |
+| **Next.js dev server** | Serves the frontend on port 3000 |
+| **Express dev server** | Serves the API on port 5000 |
+
+**Environment variables:**
+- [server/.env](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/.env) → `MONGO_URI`, `JWT_SECRET`
+- [client/.env.local](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/client/.env.local) → `NEXT_PUBLIC_API_URL=http://localhost:5000/api`
+
+---
+
+## 🔒 Security Summary
+
+| Concern | How it's handled |
+|---|---|
+| Password storage | bcryptjs (`genSalt(10)`) |
+| Auth | JWT, 1h expiry for teams, 4h for admin |
+| Route protection | [auth](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/middleware/authMiddleware.js#3-15) / [adminAuth](file:///c:/Users/pratyush/OneDrive/Desktop/mcq/server/middleware/authMiddleware.js#16-29) middleware on every protected route |
+| Anti-cheat | Tab-switch detection → warnings → auto-disqualify at 4 violations |
+| Score manipulation | Score is computed server-side only; client never sends a score |
+| Double submission | Idempotent `/submit` — returns stored score if already submitted |

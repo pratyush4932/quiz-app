@@ -34,7 +34,8 @@ const teamSchema = new mongoose.Schema({
         questionId: mongoose.Schema.Types.ObjectId,
         answerText: String,
         attemptsUsed: { type: Number, default: 0 },
-        isCorrect: { type: Boolean, default: false }
+        isCorrect: { type: Boolean, default: false },
+        hintsUsed: { type: Number, default: 0 }
     }]
 }, { timestamps: true });
 

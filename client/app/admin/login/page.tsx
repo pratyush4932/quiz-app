@@ -37,16 +37,25 @@ export default function AdminLogin() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5 }}
-                className="w-full max-w-md p-8 relative z-10 glass rounded-2xl shadow-2xl border border-error/30"
+                className="w-full max-w-md p-8 relative z-10 glass rounded-2xl shadow-2xl"
+                style={{ border: '1px solid rgba(139, 37, 0, 0.35)' }}
             >
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-error/20 rounded-full flex items-center justify-center mx-auto mb-4 text-error text-2xl border border-error/30">
+                    <div
+                        className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"
+                        style={{
+                            background: 'rgba(139, 37, 0, 0.12)',
+                            border: '1px solid rgba(139, 37, 0, 0.3)',
+                            color: 'var(--error)',
+                        }}
+                    >
                         <FaUserShield />
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">
+                    <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--ink)', fontFamily: 'Georgia, serif' }}>
                         Admin Access
                     </h1>
-                    <p className="text-gray-500 text-sm">Restricted Area. Authorized Personnel Only.</p>
+                    <p className="text-sm" style={{ color: 'var(--ink-faded)' }}>Restricted Area. Authorized Personnel Only.</p>
+                    <div className="mt-3 mx-auto w-24 h-0.5" style={{ background: 'linear-gradient(to right, transparent, rgba(139,37,0,0.5), transparent)' }} />
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -56,7 +65,12 @@ export default function AdminLogin() {
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full px-5 py-3 rounded-lg bg-black/40 border border-white/10 focus:border-error focus:ring-1 focus:ring-error outline-none transition-all placeholder:text-gray-600 text-white font-mono"
+                                className="w-full px-5 py-3 rounded-lg outline-none transition-all font-mono"
+                                style={{
+                                    background: 'rgba(250, 243, 224, 0.5)',
+                                    border: '1px solid rgba(139, 37, 0, 0.25)',
+                                    color: 'var(--ink)',
+                                }}
                                 placeholder="Username"
                                 required
                             />
@@ -67,7 +81,12 @@ export default function AdminLogin() {
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-5 py-3 rounded-lg bg-black/40 border border-white/10 focus:border-error focus:ring-1 focus:ring-error outline-none transition-all placeholder:text-gray-600 text-white font-mono"
+                                className="w-full px-5 py-3 rounded-lg outline-none transition-all font-mono"
+                                style={{
+                                    background: 'rgba(250, 243, 224, 0.5)',
+                                    border: '1px solid rgba(139, 37, 0, 0.25)',
+                                    color: 'var(--ink)',
+                                }}
                                 placeholder="Passkey"
                                 required
                             />
@@ -80,7 +99,12 @@ export default function AdminLogin() {
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0 }}
-                                className="text-error text-xs text-center font-mono bg-error/10 py-2 rounded border border-error/30"
+                                className="text-xs text-center font-mono py-2 rounded"
+                                style={{
+                                    color: 'var(--error)',
+                                    background: 'rgba(139, 37, 0, 0.08)',
+                                    border: '1px solid rgba(139, 37, 0, 0.25)',
+                                }}
                             >
                                 [ERROR] {error}
                             </motion.div>
@@ -90,10 +114,14 @@ export default function AdminLogin() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className={`w-full py-3 rounded-lg font-bold text-sm uppercase tracking-wider shadow-lg transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 cursor-not-allowed bg-gray-800 text-gray-400' : 'bg-error hover:bg-red-600 text-white shadow-error/20'
-                            }`}
+                        className={`w-full py-3 rounded-lg font-bold text-sm uppercase tracking-wider shadow-lg transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        style={{
+                            background: isLoading ? 'rgba(92, 61, 30, 0.3)' : 'linear-gradient(135deg, #8B2500, #c0392b)',
+                            color: '#faf3e0',
+                            boxShadow: '0 4px 15px rgba(139, 37, 0, 0.3)',
+                        }}
                     >
-                        {isLoading ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <><FaLock /> Authenticate</>}
+                        {isLoading ? <div className="animate-spin w-4 h-4 border-2 border-amber-200/30 border-t-amber-100 rounded-full"></div> : <><FaLock /> Authenticate</>}
                     </button>
                 </form>
             </motion.div>

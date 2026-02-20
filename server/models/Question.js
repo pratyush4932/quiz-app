@@ -5,9 +5,12 @@ const questionSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    image: {
-        type: String, // URL to image
-        default: ''
+    links: {
+        type: [{
+            label: { type: String, default: '' },
+            url: { type: String }
+        }],
+        default: []
     },
     correctAnswer: {
         type: String,
@@ -21,6 +24,10 @@ const questionSchema = new mongoose.Schema({
     maxAttempts: {
         type: Number,
         default: 1
+    },
+    hints: {
+        type: [String],
+        default: []
     },
     category: {
         type: String,
