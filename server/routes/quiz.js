@@ -96,7 +96,8 @@ router.post('/attempt', auth, async (req, res) => {
         res.json({
             correct: isCorrect,
             attemptsLeft: maxAttempts - storedAnswer.attemptsUsed,
-            message: isCorrect ? 'Correct!' : 'Incorrect answer.'
+            message: isCorrect ? 'Correct!' : 'Incorrect answer.',
+            newScore: team.score
         });
 
     } catch (err) {
@@ -211,7 +212,7 @@ router.post('/hint', auth, async (req, res) => {
         if (hintIndex >= (storedAnswer.hintsUsed || 0)) {
             storedAnswer.hintsUsed = hintIndex + 1;
             const deduction = (hintIndex + 1) * 5; // hint1=-5, hint2=-10, hint3=-15
-            team.score = Math.max(0, (team.score || 0) - deduction);
+            team.score = (team.score || 0) - deduction;
         }
 
         await team.save();

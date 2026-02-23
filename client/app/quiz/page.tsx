@@ -144,7 +144,7 @@ export default function QuizPage() {
                 answerText: answerText
             });
 
-            const { correct, attemptsLeft, message } = res.data;
+            const { correct, attemptsLeft, message, newScore } = res.data;
 
             setUserState(prev => ({
                 ...prev,
@@ -156,9 +156,8 @@ export default function QuizPage() {
                 }
             }));
 
-            if (correct) {
-                const pts = currentQ.difficulty === 'Easy' ? 25 : currentQ.difficulty === 'Medium' ? 50 : 100;
-                setLiveScore(prev => prev + pts);
+            if (newScore !== undefined) {
+                setLiveScore(newScore);
             }
 
             setFeedback({
@@ -195,7 +194,7 @@ export default function QuizPage() {
                 ...prev,
                 [currentQ._id]: { ...prev[currentQ._id], hintsUsed: res.data.hintsUsed }
             }));
-            showToast('Hint revealed! −5 pts deducted.', 'info');
+            showToast(`Hint revealed! −${(alreadyRevealed + 1) * 5} pts deducted.`, 'info');
         } catch (err: any) {
             showToast(err.response?.data?.msg || 'Could not reveal hint', 'error');
         } finally {
